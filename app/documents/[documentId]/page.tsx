@@ -10,6 +10,7 @@ import { useDocument } from "@/hooks/useDocument";
 import { useNetwork } from "@/hooks/useNetwork";
 import { useSyncContext } from "@/providers/SyncProvider";
 import { SocketProvider, useSocketContext } from "@/providers/SocketProvider";
+import { isSocketEnabled } from "@/lib/socket";
 import { usePresenceStore } from "@/stores/presence-store";
 import { useSyncStore } from "@/stores/sync-store";
 
@@ -36,13 +37,23 @@ function EditorPageContent({ documentId }: { documentId: string }) {
     }
   }, [documentId, online, triggerSync]);
 
+  useEffect(() => {
+    if (document && document.id !== documentId) {
+      router.replace(`/documents/${document.id}`);
+    }
+  }, [document, documentId, router]);
+
   const handleSave = useCallback(
     async (content: string, title: string) => {
       if (!documentId) return;
-      await updateDocument(documentId, { content, title });
+      const updated = await updateDocument(documentId, { content, title });
+      if (updated.id !== documentId) {
+        router.replace(`/documents/${updated.id}`);
+      }
       if (online) void triggerSync();
+      return updated.id;
     },
-    [documentId, updateDocument, online, triggerSync]
+    [documentId, updateDocument, online, triggerSync, router]
   );
 
   if (loading) {
@@ -99,7 +110,10 @@ export default function EditorPage() {
   const { online } = useNetwork();
 
   return (
-    <SocketProvider documentId={documentId} autoConnect={online}>
+    <SocketProvider
+      documentId={documentId}
+      autoConnect={online && isSocketEnabled()}
+    >
       <EditorPageContent documentId={documentId} />
     </SocketProvider>
   );

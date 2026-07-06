@@ -59,11 +59,9 @@ class NetworkMonitor {
     }
 
     try {
-      const appUrl =
-        process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
-      const response = await fetch(`${appUrl}/api/health`, {
+      const response = await fetch("/api/health", {
         method: "HEAD",
         cache: "no-store",
         signal: controller.signal,

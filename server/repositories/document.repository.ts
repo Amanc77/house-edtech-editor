@@ -42,6 +42,10 @@ export const documentRepository = {
   },
 
   async create(data: CreateDocumentData): Promise<Document> {
+    if (!mongoose.isValidObjectId(data.ownerId)) {
+      throw new Error("Invalid owner ID");
+    }
+
     const doc = await DocumentModel.create({
       title: data.title,
       content: data.content ?? "",
@@ -55,6 +59,7 @@ export const documentRepository = {
   },
 
   async update(id: string, data: UpdateDocumentData): Promise<Document | null> {
+    if (!mongoose.isValidObjectId(id)) return null;
     const doc = await DocumentModel.findByIdAndUpdate(
       id,
       { $set: data },
@@ -64,6 +69,7 @@ export const documentRepository = {
   },
 
   async delete(id: string): Promise<boolean> {
+    if (!mongoose.isValidObjectId(id)) return false;
     const result = await DocumentModel.deleteOne({ _id: id });
     return result.deletedCount > 0;
   },
@@ -72,6 +78,10 @@ export const documentRepository = {
     items: Document[];
     total: number;
   }> {
+    if (!mongoose.isValidObjectId(filter.userId)) {
+      return { items: [], total: 0 };
+    }
+
     const page = filter.page ?? 1;
     const pageSize = filter.pageSize ?? 20;
     const skip = (page - 1) * pageSize;

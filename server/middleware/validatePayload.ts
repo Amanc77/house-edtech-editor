@@ -112,6 +112,10 @@ export function errorResponse(
 
 export function handleServiceError(error: unknown): Response {
   if (error instanceof Error) {
+    if (error.name === "CastError" || error.name === "BSONError") {
+      return errorResponse("Invalid resource identifier", 400);
+    }
+
     const statusCode =
       "statusCode" in error && typeof error.statusCode === "number"
         ? error.statusCode

@@ -44,6 +44,8 @@ function prepare() {
 const sharedEnv = {
   ...process.env,
   SOCKET_PORT: socketPort,
+  NEXT_PUBLIC_SOCKET_ENABLED:
+    process.env.NEXT_PUBLIC_SOCKET_ENABLED ?? "true",
   NEXT_PUBLIC_SOCKET_URL:
     process.env.NEXT_PUBLIC_SOCKET_URL || `http://localhost:${socketPort}`,
 };

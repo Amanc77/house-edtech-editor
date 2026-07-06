@@ -16,6 +16,10 @@ export const permissionRepository = {
     documentId: string,
     userId: string
   ): Promise<Permission | null> {
+    if (!mongoose.isValidObjectId(documentId) || !mongoose.isValidObjectId(userId)) {
+      return null;
+    }
+
     const doc = await PermissionModel.findOne({
       documentId: new mongoose.Types.ObjectId(documentId),
       userId: new mongoose.Types.ObjectId(userId),
@@ -25,6 +29,14 @@ export const permissionRepository = {
   },
 
   async create(data: CreatePermissionData): Promise<Permission> {
+    if (
+      !mongoose.isValidObjectId(data.documentId) ||
+      !mongoose.isValidObjectId(data.userId) ||
+      !mongoose.isValidObjectId(data.grantedBy)
+    ) {
+      throw new Error("Invalid permission reference");
+    }
+
     const doc = await PermissionModel.create({
       documentId: new mongoose.Types.ObjectId(data.documentId),
       userId: new mongoose.Types.ObjectId(data.userId),
@@ -39,6 +51,10 @@ export const permissionRepository = {
     userId: string,
     role: DocumentRole
   ): Promise<Permission | null> {
+    if (!mongoose.isValidObjectId(documentId) || !mongoose.isValidObjectId(userId)) {
+      return null;
+    }
+
     const doc = await PermissionModel.findOneAndUpdate(
       {
         documentId: new mongoose.Types.ObjectId(documentId),
@@ -52,6 +68,10 @@ export const permissionRepository = {
   },
 
   async delete(documentId: string, userId: string): Promise<boolean> {
+    if (!mongoose.isValidObjectId(documentId) || !mongoose.isValidObjectId(userId)) {
+      return false;
+    }
+
     const result = await PermissionModel.deleteOne({
       documentId: new mongoose.Types.ObjectId(documentId),
       userId: new mongoose.Types.ObjectId(userId),
@@ -60,6 +80,10 @@ export const permissionRepository = {
   },
 
   async listByDocument(documentId: string): Promise<PermissionWithUser[]> {
+    if (!mongoose.isValidObjectId(documentId)) {
+      return [];
+    }
+
     const permissions = await PermissionModel.find({
       documentId: new mongoose.Types.ObjectId(documentId),
     })
@@ -81,6 +105,10 @@ export const permissionRepository = {
   },
 
   async listDocumentIdsForUser(userId: string): Promise<string[]> {
+    if (!mongoose.isValidObjectId(userId)) {
+      return [];
+    }
+
     const permissions = await PermissionModel.find({
       userId: new mongoose.Types.ObjectId(userId),
     })
@@ -91,6 +119,10 @@ export const permissionRepository = {
   },
 
   async deleteAllForDocument(documentId: string): Promise<number> {
+    if (!mongoose.isValidObjectId(documentId)) {
+      return 0;
+    }
+
     const result = await PermissionModel.deleteMany({
       documentId: new mongoose.Types.ObjectId(documentId),
     });

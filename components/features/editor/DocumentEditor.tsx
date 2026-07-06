@@ -23,6 +23,7 @@ import { common, createLowlight } from "lowlight";
 import { ArrowLeft, History, Loader2, Save, Share2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { DocumentMeta, DocumentVersion, PresenceUser, SyncStatus } from "@/types";
+import { apiPath, parseJsonResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +44,7 @@ const lowlight = createLowlight(common);
 interface DocumentEditorProps {
   document: DocumentMeta;
   onUpdate?: (content: string, title?: string) => void;
-  onSave?: (content: string, title: string) => Promise<void>;
+  onSave?: (content: string, title: string) => Promise<string | void>;
   presenceUsers?: PresenceUser[];
   syncStatus?: SyncStatus;
   connected?: boolean;
@@ -294,9 +295,9 @@ export function DocumentEditor({
     setSavingVersion(true);
     try {
       const html = editor.getHTML();
-      await onSave?.(html, title);
+      const savedId = (await onSave?.(html, title)) ?? document.id;
 
-      const res = await fetch(`/api/versions/${document.id}`, {
+      const res = await fetch(apiPath(`/api/versions/${savedId}`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -304,7 +305,7 @@ export function DocumentEditor({
           label: title || "Manual save",
         }),
       });
-      const json = await res.json();
+      const json = await parseJsonResponse(res);
       if (!res.ok) {
         throw new Error(json.error ?? "Failed to save version");
       }

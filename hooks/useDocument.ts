@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { DocumentMeta, Operation } from "@/types";
-import { apiPath } from "@/lib/api";
+import { apiPath, parseJsonResponse } from "@/lib/api";
+import { isMongoObjectId } from "@/lib/mongo-id";
 import { computeChecksum } from "@/utils/content";
 import { generateId } from "@/lib/utils";
 import {
@@ -52,6 +53,35 @@ function toStoredDocument(
   });
 }
 
+async function createDocumentOnServer(
+  title: string,
+  content: string
+): Promise<DocumentMeta> {
+  const response = await fetch(apiPath("/api/documents"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ title, content }),
+  });
+
+  const result = await parseJsonResponse<DocumentMeta>(response);
+  if (!response.ok || !result.data) {
+    throw new Error(result.error ?? "Failed to create document on server");
+  }
+
+  return result.data;
+}
+
+async function replaceLocalDocumentId(
+  localId: string,
+  remote: DocumentMeta
+): Promise<DocumentMeta> {
+  await deleteLocalDocument(localId);
+  const stored = toStoredDocument(remote);
+  await upsertDocument(stored);
+  return toDocumentMeta(stored);
+}
+
 export interface UseDocumentResult {
   documents: DocumentMeta[];
   document: DocumentMeta | null;
@@ -97,9 +127,10 @@ export function useDocument(documentId?: string): UseDocumentResult {
         });
 
         if (response.ok) {
-          const result = await response.json();
-          const remoteDocs: DocumentMeta[] =
-            result.data?.items ?? result.data ?? [];
+          const result = await parseJsonResponse<DocumentMeta[] | { items: DocumentMeta[] }>(response);
+          const remoteDocs: DocumentMeta[] = Array.isArray(result.data)
+            ? result.data
+            : (result.data?.items ?? []);
           for (const doc of remoteDocs) {
             await upsertDocument(toStoredDocument(doc));
           }
@@ -170,17 +201,32 @@ export function useDocument(documentId?: string): UseDocumentResult {
         let doc = await getDocument(id);
 
         if (online) {
+          const shouldRegisterOnServer =
+            !!doc && !isMongoObjectId(id);
+
+          if (shouldRegisterOnServer && doc) {
+            const remote = await createDocumentOnServer(doc.title, doc.content);
+            const meta = await replaceLocalDocumentId(id, remote);
+            removeDocumentFromStore(id);
+            addDocument(meta);
+            setDocument(meta);
+            updateDocumentInStore(meta.id, meta);
+            return meta;
+          }
+
           const response = await fetch(apiPath(`/api/documents/${id}`), {
             credentials: "include",
           });
 
           if (response.ok) {
-            const result = await response.json();
-            const remote = result.data as DocumentMeta & {
-              lamportClock?: number;
-              vectorClock?: Record<string, number>;
-              checksum?: string;
-            };
+            const result = await parseJsonResponse<
+              DocumentMeta & {
+                lamportClock?: number;
+                vectorClock?: Record<string, number>;
+                checksum?: string;
+              }
+            >(response);
+            const remote = result.data;
             if (remote) {
               await upsertDocument(toStoredDocument(remote));
               doc = await getDocument(id);
@@ -207,11 +253,19 @@ export function useDocument(documentId?: string): UseDocumentResult {
         setLocalLoading(false);
       }
     },
-    [online, setError, updateDocumentInStore]
+    [online, setError, updateDocumentInStore, addDocument, removeDocumentFromStore]
   );
 
   const createDocument = useCallback(
     async (title: string, content = "") => {
+      if (online) {
+        const remoteDoc = await createDocumentOnServer(title, content);
+        const stored = toStoredDocument(remoteDoc);
+        await upsertDocument(stored);
+        addDocument(toDocumentMeta(stored));
+        return toDocumentMeta(stored);
+      }
+
       const now = new Date().toISOString();
       const ownerId = user?.id ?? "local-user";
       const newDoc = createStoredDocument({
@@ -228,34 +282,9 @@ export function useDocument(documentId?: string): UseDocumentResult {
 
       await upsertDocument(newDoc);
       addDocument(toDocumentMeta(newDoc));
-
-      if (online) {
-        try {
-          const response = await fetch(apiPath("/api/documents"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ title, content }),
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            const remoteDoc = result.data as DocumentMeta;
-            const stored = toStoredDocument(remoteDoc);
-            await deleteLocalDocument(newDoc.id);
-            await upsertDocument(stored);
-            removeDocumentFromStore(newDoc.id);
-            addDocument(toDocumentMeta(stored));
-            return toDocumentMeta(stored);
-          }
-        } catch {
-          // offline-first: local doc is source of truth until sync
-        }
-      }
-
       return toDocumentMeta(newDoc);
     },
-    [user, online, addDocument, removeDocumentFromStore]
+    [user, online, addDocument]
   );
 
   const updateDocument = useCallback(
@@ -290,20 +319,48 @@ export function useDocument(documentId?: string): UseDocumentResult {
 
       if (online) {
         try {
-          await fetch(apiPath(`/api/documents/${id}`), {
+          if (!isMongoObjectId(id)) {
+            const remote = await createDocumentOnServer(
+              updates.title ?? existing.title,
+              updates.content ?? existing.content
+            );
+            const meta = await replaceLocalDocumentId(id, remote);
+            removeDocumentFromStore(id);
+            addDocument(meta);
+            setDocument(meta);
+            return meta;
+          }
+
+          const response = await fetch(apiPath(`/api/documents/${id}`), {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
             body: JSON.stringify(updates),
           });
+
+          if (response.status === 404) {
+            const remote = await createDocumentOnServer(
+              updates.title ?? existing.title,
+              updates.content ?? existing.content
+            );
+            const createdMeta = await replaceLocalDocumentId(id, remote);
+            removeDocumentFromStore(id);
+            addDocument(createdMeta);
+            setDocument(createdMeta);
+            return createdMeta;
+          }
+
+          if (!response.ok) {
+            await parseJsonResponse(response).catch(() => undefined);
+          }
         } catch {
-          // queued via operations if needed
+          // offline-first: local doc is source of truth until sync
         }
       }
 
       return meta;
     },
-    [online, updateDocumentInStore]
+    [online, updateDocumentInStore, addDocument, removeDocumentFromStore]
   );
 
   const deleteDocument = useCallback(

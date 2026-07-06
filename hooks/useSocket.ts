@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { io, type Socket } from "socket.io-client";
 import { HEARTBEAT_INTERVAL_MS } from "@/constants";
 import type { Operation, PresenceUser } from "@/types";
+import { isSocketEnabled, getSocketUrl } from "@/lib/socket";
 import { useAuthStore } from "@/stores/auth-store";
 import { usePresenceStore } from "@/stores/presence-store";
 import { useNetwork } from "./useNetwork";
@@ -74,8 +75,16 @@ export function useSocket(options: UseSocketOptions = {}) {
   const connect = useCallback(() => {
     if (socketRef.current?.connected) return socketRef.current;
 
-    const socketUrl =
-      process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:3000";
+    const socketUrl = getSocketUrl();
+    if (!socketUrl || !isSocketEnabled()) {
+      setState({
+        connected: false,
+        connecting: false,
+        error: null,
+        socket: null,
+      });
+      return null;
+    }
 
     setState((s) => ({ ...s, connecting: true, error: null }));
 
@@ -117,6 +126,7 @@ export function useSocket(options: UseSocketOptions = {}) {
     });
 
     socket.on("connect_error", (err) => {
+      if (!isSocketEnabled()) return;
       setState({
         connected: false,
         connecting: false,
@@ -239,8 +249,9 @@ export function useSocket(options: UseSocketOptions = {}) {
   }, [documentId, setDocumentId]);
 
   useEffect(() => {
-    if (!autoConnect || !online || !user) return;
+    if (!autoConnect || !online || !user || !isSocketEnabled()) return;
     const socket = connect();
+    if (!socket) return;
     return () => {
       if (documentId) {
         socket.emit("document:leave", documentId);

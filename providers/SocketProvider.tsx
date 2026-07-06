@@ -15,7 +15,7 @@ interface SocketContextValue {
   connecting: boolean;
   error: string | null;
   socket: Socket | null;
-  connect: () => Socket;
+  connect: () => Socket | null;
   disconnect: () => void;
   emitOperation: (operation: Operation) => void;
   emitCursor: (cursor: { from: number; to: number } | null) => void;

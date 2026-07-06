@@ -1,156 +1,89 @@
 # SyncDocs
 
-**Local-first collaborative document editor** with offline synchronization, deterministic conflict resolution, version history, real-time collaboration, and AI features.
+**Local-first collaborative document editor** — offline sync, conflict resolution, version history, and AI-assisted writing.
 
-Built for the [House of Edtech](https://houseofedtech.in) Full Stack Developer assignment.
+Built for the [House of Edtech](https://houseofedtech.in) Full Stack Developer Assignment (v2.1).
 
 ## Live Demo
 
-> Deploy to Vercel and add your URL here after deployment.
+**[https://house-edtech-editor.vercel.app](https://house-edtech-editor.vercel.app)**
 
-## Features
+## What It Does
 
-- **Local-first architecture** — IndexedDB (Dexie) as source of truth; zero network blocking
-- **Background sync engine** — Operation queue, retry with exponential backoff, batch upload
-- **Deterministic conflict resolution** — Lamport clocks + vector clocks, no data loss
-- **Version history** — Snapshots, compare, restore (creates new version, never destroys history)
-- **Real-time collaboration** — Socket.io presence, cursors, typing indicators
-- **Rich text editor** — TipTap with tables, code blocks, slash commands, emoji
-- **AI assistant** — Summarize, improve, grammar, translate, continue writing (OpenAI/Gemini)
-- **Auth & RBAC** — Auth.js JWT, Owner / Editor / Viewer roles
-- **Security** — Rate limiting, Zod validation, payload size limits, input sanitization
+SyncDocs is a Google Docs–style editor that works **without internet**. Edits save instantly to IndexedDB, sync in the background when online, and merge deterministically using Lamport + vector clocks — no data loss.
+
+| Capability | Implementation |
+|------------|----------------|
+| Local-first editing | Dexie (IndexedDB) as primary store |
+| Background sync | Queued operations, retry with backoff |
+| Conflict resolution | Lamport clocks + vector clocks |
+| Version history | Snapshots, compare, safe restore |
+| Auth & RBAC | Auth.js JWT — Owner / Editor / Viewer |
+| AI features | AI SDK (OpenAI / Gemini) |
+| Real-time (optional) | Socket.io on custom Node server |
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Framework | Next.js 16, React 19, TypeScript |
-| Database | MongoDB, Mongoose |
-| Auth | Auth.js (NextAuth v5), JWT |
-| Offline | Dexie (IndexedDB) |
-| Real-time | Socket.io |
-| State | Zustand |
-| UI | Tailwind CSS, shadcn/ui, Radix UI |
-| AI | AI SDK (OpenAI, Gemini) |
-| Testing | Vitest, Playwright |
+Next.js 16 · React 19 · TypeScript · MongoDB · Auth.js · Dexie · Socket.io · Zustand · TipTap · Tailwind · shadcn/ui · Vitest · Playwright
 
 ## Quick Start
 
-### Prerequisites
-
-- Node.js 20+
-- MongoDB (local or [MongoDB Atlas](https://www.mongodb.com/atlas) free tier)
-
-### 1. Clone & install
-
 ```bash
-git clone <your-repo-url>
+git clone <your-repo>
 cd house-edtech-editor
 npm install
+cp .env.example .env.local   # fill in MongoDB + AUTH_SECRET
+npm run dev                  # http://localhost:3000
 ```
 
-### 2. Environment
+**Requirements:** Node 20+, MongoDB ([Atlas](https://www.mongodb.com/atlas) free tier works).
 
-Copy `.env.example` to `.env.local` and fill in:
+## Deploy on Vercel
 
-```bash
-cp .env.example .env.local
-```
+1. Push to GitHub and import at [vercel.com/new](https://vercel.com/new)
+2. Set environment variables:
 
-**Required variables:**
+| Variable | Example |
+|----------|---------|
+| `MONGODB_URI` | `mongodb+srv://...` |
+| `AUTH_SECRET` | `openssl rand -base64 32` |
+| `AUTH_URL` | `https://your-app.vercel.app` |
+| `NEXT_PUBLIC_APP_URL` | `https://your-app.vercel.app` |
+| `NEXT_PUBLIC_SOCKET_ENABLED` | `false` |
+| `NEXT_PUBLIC_AUTHOR_NAME` | Your name |
+| `NEXT_PUBLIC_GITHUB_URL` | Your GitHub |
+| `NEXT_PUBLIC_LINKEDIN_URL` | Your LinkedIn |
 
-| Variable | Description |
-|----------|-------------|
-| `MONGODB_URI` | MongoDB connection string |
-| `AUTH_SECRET` | Random 32+ char secret (`openssl rand -base64 32`) |
-| `AUTH_URL` | App URL (`http://localhost:3000`) |
-| `NEXT_PUBLIC_APP_URL` | Same as AUTH_URL for client |
+3. Deploy
 
-**Optional:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPENAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`
+> **Note:** Vercel runs serverless — real-time WebSockets need a custom server (Railway/Render). On Vercel, offline sync and all HTTP APIs work fully; Socket.io is disabled automatically.
 
-**Footer (submission):** Set `NEXT_PUBLIC_AUTHOR_NAME`, `NEXT_PUBLIC_GITHUB_URL`, `NEXT_PUBLIC_LINKEDIN_URL`
-
-### 3. Run locally
-
-**Option A — Next.js only (Vercel-compatible, HTTP sync):**
-
-```bash
-npm run dev:next
-```
-
-**Option B — Full stack with Socket.io (custom server):**
+## Scripts
 
 ```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000)
-
-### 4. Scripts
-
-```bash
-npm run dev          # Next.js (3000) + Socket.io (3001)
-npm run dev:server   # Custom server + Socket.io on 3000 (production-like)
-npm run dev:next     # Next.js dev only
+npm run dev          # Next.js + Socket.io (local)
 npm run build        # Production build
-npm run start        # Production custom server
-npm run lint         # ESLint
-npm run type-check   # TypeScript
-npm run test         # Vitest unit tests
-npm run test:e2e     # Playwright E2E
+npm run start        # Custom server (production)
+npm run test         # Unit tests
+npm run test:e2e     # E2E tests
 ```
 
-## Deploy to Vercel (Live)
-
-1. Push code to GitHub
-2. Import project at [vercel.com/new](https://vercel.com/new)
-3. Add environment variables (same as `.env.local`)
-4. Deploy
-
-> **Note:** Vercel runs serverless functions — Socket.io real-time requires the custom server (`npm run dev` / deploy to Railway/Render). Offline sync and all API features work on Vercel via HTTP.
-
-### MongoDB Atlas setup
-
-1. Create free cluster at [mongodb.com/atlas](https://www.mongodb.com/atlas)
-2. Database Access → create user
-3. Network Access → allow `0.0.0.0/0` (or Vercel IPs)
-4. Connect → copy connection string → set as `MONGODB_URI`
-
-## Project Structure
+## Architecture
 
 ```
-app/           # Next.js pages & API routes
-components/    # UI components (shadcn, features, layout)
-features/      # Feature modules
-server/        # Controllers → Services → Repositories → MongoDB
-offline/       # Dexie DB, sync engine, merge client
-stores/        # Zustand stores
-hooks/         # React hooks
-providers/     # Context providers
-schemas/       # Zod validation
-types/         # TypeScript types
-lib/           # Auth, merge engine, security utils
-tests/         # Vitest & Playwright tests
-docs/          # Architecture documentation
+Client (IndexedDB) ──sync queue──▶ POST /api/sync ──▶ MongoDB
+                                 ◀── merged state ──┘
 ```
 
-## API Overview
+- **Offline:** All reads/writes hit IndexedDB — zero UI blocking
+- **Online:** Background engine pushes operations, fetches remote changes
+- **Security:** Zod validation, rate limiting, payload size caps, HTML sanitization
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/auth/register` | POST | Register user |
-| `/api/auth/login` | POST | Login (JWT session) |
-| `/api/documents` | GET/POST | List / create documents |
-| `/api/documents/[id]` | GET/PATCH/DELETE | Document CRUD |
-| `/api/sync` | POST | Push offline operations |
-| `/api/versions/[id]` | GET/POST | Version history |
-| `/api/ai` | POST | AI features |
-
-See [docs/API.md](docs/API.md) for full reference.
+See [docs/API.md](docs/API.md) for API reference.
 
 ## Author
 
-Update footer env vars with your name and profiles before submission.
+Configure footer via env: `NEXT_PUBLIC_AUTHOR_NAME`, `NEXT_PUBLIC_GITHUB_URL`, `NEXT_PUBLIC_LINKEDIN_URL`.
 
 ## License
 

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { AIFeature } from "@/types";
+import { apiPath, parseJsonResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -94,7 +95,7 @@ export function AISidebar({ editor, documentId, className }: AISidebarProps) {
     setResult("");
 
     try {
-      const res = await fetch("/api/ai", {
+      const res = await fetch(apiPath("/api/ai"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -105,13 +106,17 @@ export function AISidebar({ editor, documentId, className }: AISidebarProps) {
         }),
       });
 
-      const json = await res.json();
+      const json = await parseJsonResponse<{ result?: string } | string>(res);
 
       if (!res.ok) {
         throw new Error(json.error ?? "AI request failed");
       }
 
-      setResult(json.data?.result ?? json.data ?? "");
+      const resultText =
+        typeof json.data === "string"
+          ? json.data
+          : (json.data?.result ?? "");
+      setResult(resultText);
       toast.success("AI processing complete");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "AI request failed");

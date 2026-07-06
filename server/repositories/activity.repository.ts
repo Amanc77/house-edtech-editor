@@ -12,6 +12,13 @@ export interface CreateActivityData {
 
 export const activityRepository = {
   async create(data: CreateActivityData): Promise<ActivityLogEntry> {
+    if (
+      !mongoose.isValidObjectId(data.documentId) ||
+      !mongoose.isValidObjectId(data.userId)
+    ) {
+      throw new Error("Invalid activity reference");
+    }
+
     const doc = await ActivityLogModel.create({
       documentId: new mongoose.Types.ObjectId(data.documentId),
       userId: new mongoose.Types.ObjectId(data.userId),
@@ -26,6 +33,10 @@ export const activityRepository = {
     page = 1,
     pageSize = 50
   ): Promise<{ items: ActivityLogEntry[]; total: number }> {
+    if (!mongoose.isValidObjectId(documentId)) {
+      return { items: [], total: 0 };
+    }
+
     const skip = (page - 1) * pageSize;
     const query = { documentId: new mongoose.Types.ObjectId(documentId) };
 
@@ -49,6 +60,10 @@ export const activityRepository = {
     page = 1,
     pageSize = 50
   ): Promise<{ items: ActivityLogEntry[]; total: number }> {
+    if (!mongoose.isValidObjectId(userId)) {
+      return { items: [], total: 0 };
+    }
+
     const skip = (page - 1) * pageSize;
     const query = { userId: new mongoose.Types.ObjectId(userId) };
 

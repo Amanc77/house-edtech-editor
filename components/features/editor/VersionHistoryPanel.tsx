@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { Clock, History, Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import type { DocumentVersion } from "@/types";
+import { apiPath, parseJsonResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,10 +36,11 @@ export function VersionHistoryPanel({
     async function loadVersions() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/versions/${documentId}`);
-        const json = await res.json();
+        const res = await fetch(apiPath(`/api/versions/${documentId}`));
+        const json = await parseJsonResponse<{ items?: DocumentVersion[] } | DocumentVersion[]>(res);
         if (res.ok && json.data) {
-          setVersions(json.data.items ?? json.data);
+          const items = Array.isArray(json.data) ? json.data : (json.data.items ?? []);
+          setVersions(items);
         }
       } catch {
         toast.error("Failed to load version history");
@@ -53,12 +55,12 @@ export function VersionHistoryPanel({
   async function handleRestore(version: DocumentVersion) {
     setRestoring(version.id);
     try {
-      const res = await fetch(`/api/versions/${documentId}/restore`, {
+      const res = await fetch(apiPath(`/api/versions/${documentId}/restore`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ versionId: version.id }),
       });
-      const json = await res.json();
+      const json = await parseJsonResponse<{ document?: { content?: string } }>(res);
 
       if (!res.ok) {
         throw new Error(json.error ?? "Failed to restore version");

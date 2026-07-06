@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Copy, Loader2, Mail, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import type { DocumentPermission, DocumentRole } from "@/types";
+import { apiPath, parseJsonResponse } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,8 +51,8 @@ export function ShareDocumentDialog({
     async function loadPermissions() {
       setIsLoading(true);
       try {
-        const res = await fetch(`/api/documents/${documentId}/permissions`);
-        const json = await res.json();
+        const res = await fetch(apiPath(`/api/documents/${documentId}/permissions`));
+        const json = await parseJsonResponse<DocumentPermission[]>(res);
         if (res.ok && json.data) {
           setPermissions(json.data);
         }
@@ -76,12 +77,12 @@ export function ShareDocumentDialog({
 
     setIsInviting(true);
     try {
-      const res = await fetch(`/api/documents/${documentId}/share`, {
+      const res = await fetch(apiPath(`/api/documents/${documentId}/share`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), role }),
       });
-      const json = await res.json();
+      const json = await parseJsonResponse<DocumentPermission>(res);
 
       if (!res.ok) {
         throw new Error(json.error ?? "Failed to invite user");
@@ -89,8 +90,9 @@ export function ShareDocumentDialog({
 
       toast.success(`Invited ${email} as ${role}`);
       setEmail("");
-      if (json.data) {
-        setPermissions((prev) => [...prev, json.data]);
+      const permission = json.data;
+      if (permission) {
+        setPermissions((prev) => [...prev, permission]);
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to invite");

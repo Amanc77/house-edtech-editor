@@ -24,6 +24,7 @@ export const versionRepository = {
     documentId: string,
     versionNumber: number
   ): Promise<Version | null> {
+    if (!mongoose.isValidObjectId(documentId)) return null;
     const doc = await VersionModel.findOne({ documentId, versionNumber }).lean<IVersion>();
     return doc ? toVersionDTO(doc as IVersion) : null;
   },
@@ -46,6 +47,10 @@ export const versionRepository = {
     page = 1,
     pageSize = 20
   ): Promise<{ items: Version[]; total: number }> {
+    if (!mongoose.isValidObjectId(documentId)) {
+      return { items: [], total: 0 };
+    }
+
     const skip = (page - 1) * pageSize;
     const query = { documentId: new mongoose.Types.ObjectId(documentId) };
 
@@ -65,6 +70,7 @@ export const versionRepository = {
   },
 
   async getLatestVersionNumber(documentId: string): Promise<number> {
+    if (!mongoose.isValidObjectId(documentId)) return 0;
     const latest = await VersionModel.findOne({
       documentId: new mongoose.Types.ObjectId(documentId),
     })
@@ -76,6 +82,7 @@ export const versionRepository = {
   },
 
   async countByDocument(documentId: string): Promise<number> {
+    if (!mongoose.isValidObjectId(documentId)) return 0;
     return VersionModel.countDocuments({
       documentId: new mongoose.Types.ObjectId(documentId),
     });
